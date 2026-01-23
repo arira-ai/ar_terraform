@@ -231,8 +231,7 @@ If you see Linux output, WSL is working.
 Always update before installing tools:
 
 ```yaml
-sudo apt update
-sudo apt upgrade -y
+sudo apt update && sudo apt upgrade -y
 ```
 
 ---
@@ -295,8 +294,7 @@ This lets you install and update HashiCorp tools securely through `apt`, just li
 ### Step 4: Install Terraform
 
 ```bash
-sudo apt update
-sudo apt install terraform -y
+sudo apt update && sudo apt install terraform -y
 ```
 
 ---
