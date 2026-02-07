@@ -19,10 +19,6 @@ resource "aws_instance" "demo" {
   }
 }
 
-provider "aws" {
-  region = "us-east-1"
-}
-
 resource "aws_dynamodb_table" "terraform_lock" {
   name         = "terraform-lock-table"
   billing_mode = "PAY_PER_REQUEST"
@@ -38,5 +34,3 @@ resource "aws_dynamodb_table" "terraform_lock" {
     Purpose = "Terraform state locking"
   }
 }
-
-
