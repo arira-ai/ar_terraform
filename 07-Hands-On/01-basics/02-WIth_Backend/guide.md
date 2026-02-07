@@ -137,10 +137,10 @@ terraform-ec2/
 ```python
 terraform {
   backend "s3" {
-    bucket         = "jhonwick-terraform-state"
+    bucket         = "arira-terraform-state"
     key            = "ec2/dev/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "terraform-locks"
+    dynamodb_table = "terraform-lock-table"
     encrypt        = true
   }
 }
@@ -255,4 +255,5 @@ flowchart TD
     U2 -->|1. terraform apply| DDB
     DDB -.->|4. Request Denied| U2
     U2 --- X["[Error] State Locked"]
+
 ```
