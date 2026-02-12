@@ -8,7 +8,7 @@ In a professional Terraform environment, managing variables across multiple envi
 Below is a **complete, minimal, real-world Terraform setup** that uses **all three concepts together**:
 
 ```mermaid
-%%{init: { 'theme': 'base', 'themeVariables': { 'primaryColor': '#283593', 'primaryTextColor': '#ffffff', 'nodeTextColor': '#ffffff', 'lineColor': '#5c6bc0', 'background': '#1a237e' } } }%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#a1cbbeff', 'primaryTextColor': '#333', 'primaryBorderColor': '#333', 'lineColor': '#aba0a0ff' }}}%%
 mindmap
   root((TF Variable Management))
     .tfvars
