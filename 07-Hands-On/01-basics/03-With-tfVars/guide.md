@@ -1,6 +1,6 @@
 # Practice - 3
 
-In a professional Terraform environment, managing variables across multiple environments (Dev, QA, Prod) requires a clean separation between :
+In a professional Terraform environment, managing variables across multiple environments (Dev, QA, Prod) requires a clean separation between:
 
 * "What the code does" and 
 * "What data it uses."
