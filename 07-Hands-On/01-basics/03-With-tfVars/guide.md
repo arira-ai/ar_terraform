@@ -1,10 +1,77 @@
 # Practice - 3
 
+In a professional Terraform environment, managing variables across multiple environments (Dev, QA, Prod) requires a clean separation between :
+
+* "What the code does" and 
+* "What data it uses."
+
 Below is a **complete, minimal, real-world Terraform setup** that uses **all three concepts together**:
 
-* `.tfvars` (environment-specific values)
-* `_common-data-link.tf` (shared data + locals)
-* `_common-data-copy.auto.tfvars` (auto-loaded common values)
+```mermaid
+%%{init: { 'theme': 'base', 'themeVariables': { 'primaryColor': '#283593', 'primaryTextColor': '#ffffff', 'nodeTextColor': '#ffffff', 'lineColor': '#5c6bc0', 'background': '#1a237e' } } }%%
+mindmap
+  root((TF Variable Management))
+    .tfvars
+      "Env Specific"
+      "Manual Load"
+      "Values for Dev/Prod"
+    
+    _common-data-link.tf
+      "The Logic Bridge"
+      "Data Sources"
+      "Local Variables"
+    
+    _common-auto.tfvars
+      "Auto-loaded"
+      "Global Values"
+      "Project Identifiers"
+```
+
+### Comparison & Use Cases
+
+| File Type | Load Priority | Purpose | Typical Content |
+| --- | --- | --- | --- |
+| **`.tfvars`** | Manual | **Environment-specific** overrides. | Instance types, environment names (`dev`, `prod`). |
+| **`_common-data-link.tf`** | Always | **The "Glue"**: Fetches existing cloud IDs. | `data "aws_vpc" {}`, `locals { prefix = "my-app" }`. |
+| **`_common-auto.tfvars`** | Automatic | **Global variables** shared by all envs. | Project IDs, Department names, Billing tags. |
+
+---
+
+### Real-Time Illustration: The "Web App" Scenario
+
+Imagine you are deploying a Web Server.
+
+#### 1. `_common-data-copy.auto.tfvars` (The Global Stuff)
+
+Terraform reads this **automatically**. It contains settings that never change, regardless of the environment.
+
+> **Content:** `project_id = "fintech-app"`, `owner = "ops-team"`
+
+#### 2. `dev.tfvars` (The Environment Choice)
+
+You pass this manually (e.g., `terraform apply -var-file="dev.tfvars"`). It contains the size and cost of this specific deployment.
+
+> **Content:** `instance_size = "t3.micro"`, `env = "development"`
+
+#### 3. `_common-data-link.tf` (The Intelligence)
+
+This isn't just data; it's **code** that looks up information in AWS based on the variables above. It uses `locals` to combine the global and environment data into a single name.
+
+> **Logic:** > * `data "aws_vpc" "selected" { tags = { Name = var.env } }`
+> * `locals { server_name = "${var.project_id}-${var.env}" }`
+> 
+> 
+
+---
+
+### Why use this specific structure?
+
+* **Zero Repetition:** You don't have to copy the "Project ID" into 10 different files. You put it once in the `.auto.tfvars` file.
+* **Dynamic Discovery:** The `_common-data-link.tf` allows your code to "discover" the VPC ID or Subnet ID in AWS rather than you hardcoding them.
+* **Safety:** By keeping `dev.tfvars` and `prod.tfvars` separate, you minimize the risk of accidentally applying "Production" sizes to your "Dev" environment.
+
+
+
 
 The goal: **Create one EC2 instance**, with values flowing from all three layers in a predictable way.
 
