@@ -1,49 +1,31 @@
-# Practice - 3
+# Terraform Multi-Environment Practice Guide (Dev + Prod)
 
-Below is a **complete, minimal, real-world Terraform setup** that uses **all three concepts together**:
-
-* `.tfvars` (environment-specific values)
-* `_common-data-link.tf` (shared data + locals)
-* `_common-data-copy.auto.tfvars` (auto-loaded common values)
-
-The goal: **Create one EC2 instance**, with values flowing from all three layers in a predictable way.
+Objective:
+Operate one codebase across multiple environments using isolated state and variable injection.
 
 ---
 
-# 1. Scenario
+# Phase 1 — Create Project Structure
 
-Desired :
-
-* **Same Terraform code** across environments .
-* **Common values** (tags, owner, AMI filters) reused everywhere .
-* **Environment overrides** without touching code .
-
-Design:
-
-* `_common-data-link.tf` → defines reusable data & locals .
-* `_common-data-copy.auto.tfvars` → global defaults (auto-loaded) .
-* `dev.tfvars` → environment-specific overrides .
-
----
-
-# 2. Final folder structure
-
-```text
+```
 terraform-ec2/
 ├── main.tf
 ├── variables.tf
 ├── _common-data-link.tf
 ├── _common-data-copy.auto.tfvars
-├── dev.tfvars
 ├── backend.tf
-└── provider.tf
+├── backend-dev.hcl
+├── backend-prod.hcl
+├── provider.tf
+├── dev.tfvars
+└── prod.tfvars
 ```
 
 ---
 
-# 3. Provider & backend
+# Phase 2 — Core Files
 
-### `1. provider.tf`
+## provider.tf
 
 ```hcl
 provider "aws" {
@@ -51,7 +33,9 @@ provider "aws" {
 }
 ```
 
-### `2. backend.tf`
+---
+
+## backend.tf
 
 ```hcl
 terraform {
@@ -63,46 +47,14 @@ terraform {
     encrypt        = true
   }
 }
+
 ```
+
+Backend config injected dynamically.
 
 ---
 
-# 4. Common data link file
-
-### `1. _common-data-link.tf`
-
-Purpose:
-
-* Central place for **shared data sources**
-* Central place for **derived values (locals)**
-
-```hcl
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = [var.ami_name_pattern]
-  }
-}
-
-locals {
-  common_tags = {
-    Project = var.project_name
-    Owner   = var.owner
-    Env     = var.environment
-  }
-}
-```
-
-No hardcoded values. Everything comes from variables.
-
----
-
-# 5. Variables definition
-
-### `1. variables.tf`
+## variables.tf
 
 ```hcl
 variable "aws_region" {
@@ -136,12 +88,31 @@ variable "ami_name_pattern" {
 
 ---
 
-# 6. Auto-loaded common values (global defaults)
+## _common-data-link.tf
 
-### `1. _common-data-copy.auto.tfvars`
+```hcl
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
 
-Terraform **automatically loads** this file.
-No `-var-file` needed.
+  filter {
+    name   = "name"
+    values = [var.ami_name_pattern]
+  }
+}
+
+locals {
+  common_tags = {
+    Project = var.project_name
+    Owner   = var.owner
+    Env     = var.environment
+  }
+}
+```
+
+---
+
+## _common-data-copy.auto.tfvars
 
 ```hcl
 aws_region       = "us-east-1"
@@ -150,33 +121,11 @@ owner            = "platform-team"
 ami_name_pattern = "amzn2-ami-hvm-*-x86_64-gp2"
 ```
 
-Used by:
-
-* provider
-* data sources
-* locals
+Auto-loaded by Terraform.
 
 ---
 
-# 7. Environment-specific overrides
-
-### `1. dev.tfvars`
-
-Only values that differ per environment.
-
-```hcl
-environment   = "dev"
-instance_type = "t2.micro"
-key_name      = "dev-keypair"
-```
-
----
-
-# 8. Main EC2 resource
-
-### `1. main.tf`
-
-This file **does not know where values come from**.
+## main.tf
 
 ```hcl
 resource "aws_instance" "demo" {
@@ -195,54 +144,166 @@ resource "aws_instance" "demo" {
 
 ---
 
-# 9. How values flow
+# Phase 3 — Environment Files
 
-```mermaid
-flowchart LR
-A[_common-data-copy.auto.tfvars] --> B[variables]
-B --> C[_common-data-link.tf]
-C --> D[locals + data]
-D --> E[main.tf EC2]
-F[dev.tfvars] --> B
+## dev.tfvars
+
+```hcl
+environment   = "dev"
+instance_type = "t2.micro"
+key_name      = "dev-keypair"
 ```
-
-Single-line labels, parser-safe.
 
 ---
 
-# 10. How to run
+## prod.tfvars
+
+```hcl
+environment   = "prod"
+instance_type = "t3.medium"
+key_name      = "prod-keypair"
+```
+
+---
+
+# Phase 4 — Backend Config Files
+
+## backend-dev.hcl
+
+```hcl
+bucket         = "ar-terraform-state"
+key            = "ec2/dev/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "terraform-locks"
+encrypt        = true
+```
+
+---
+
+## backend-prod.hcl
+
+```hcl
+bucket         = "ar-terraform-state"
+key            = "ec2/prod/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "terraform-locks"
+encrypt        = true
+```
+
+Separate state per environment.
+
+---
+
+# Phase 5 — Execution Workflow
+
+## 1. Deploy DEV
 
 ```bash
-terraform init
+terraform init -backend-config=backend-dev.hcl
 terraform plan -var-file=dev.tfvars
 terraform apply -var-file=dev.tfvars
 ```
 
-Why:
+Verify:
 
-* `.auto.tfvars` → loaded automatically
-* `dev.tfvars` → explicitly injected
-
----
-
-# 11. What each file is responsible for (mental model)
-
-| File                            | Responsibility               |
-| ------------------------------- | ---------------------------- |
-| `_common-data-link.tf`          | Shared data sources + locals |
-| `_common-data-copy.auto.tfvars` | Global defaults              |
-| `dev.tfvars`                    | Environment overrides        |
-| `variables.tf`                  | Contract/interface           |
-| `main.tf`                       | Pure infrastructure logic    |
+```bash
+aws ec2 describe-instances --filters Name=tag:Env,Values=dev
+```
 
 ---
 
-# 12. Why this pattern scales
+## 2. Deploy PROD
 
-* Zero duplication
-* Clean separation of concerns
-* Easy multi-env (`prod.tfvars`, `stage.tfvars`)
-* Safe for teams
-* Backend-safe
+```bash
+terraform init -reconfigure -backend-config=backend-prod.hcl
+terraform plan -var-file=prod.tfvars
+terraform apply -var-file=prod.tfvars
+```
+
+Verify:
+
+```bash
+aws ec2 describe-instances --filters Name=tag:Env,Values=prod
+```
 
 ---
+
+# Phase 6 — Validate State Isolation
+
+Check S3 bucket:
+
+```
+ec2/dev/terraform.tfstate
+ec2/prod/terraform.tfstate
+```
+
+States must be separate.
+
+---
+
+# Phase 7 — Destroy Safely
+
+Destroy DEV only:
+
+```bash
+terraform init -backend-config=backend-dev.hcl
+terraform destroy -var-file=dev.tfvars
+```
+
+Destroy PROD separately:
+
+```bash
+terraform init -backend-config=backend-prod.hcl
+terraform destroy -var-file=prod.tfvars
+```
+
+Isolation prevents cross-environment damage.
+
+---
+
+# Phase 8 — Mental Model
+
+Environment = Input + State
+Code = Constant
+
+Never duplicate code.
+Only change:
+
+* Backend config
+* tfvars file
+
+Infrastructure becomes deterministic and repeatable.
+
+---
+
+# Advanced Practice
+
+Extend this exercise:
+
+1. Add `stage.tfvars`
+2. Add autoscaling group for prod only
+3. Add conditional logic:
+
+```hcl
+count = var.environment == "prod" ? 1 : 0
+```
+
+4. Convert EC2 to module
+5. Introduce workspaces and compare pattern differences
+
+---
+
+# Expected Learning Outcome
+
+After this practice you should understand:
+
+* Remote state isolation
+* Variable injection hierarchy
+* Auto tfvars behavior
+* Backend reconfiguration
+* Environment-driven infrastructure
+* Safe multi-environment deployments
+
+No duplication.
+No branching.
+Only controlled parameterization.

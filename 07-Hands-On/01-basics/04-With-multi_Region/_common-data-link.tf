@@ -1,17 +1,12 @@
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = [var.ami_name_pattern]
-  }
-}
+data "aws_caller_identity" "current" {}
 
 locals {
-  common_tags = {
-    Project = var.project_name
-    Owner   = var.owner
-    Env     = var.environment
-  }
+  name_prefix = "${var.project_name}-${var.aws_region}"
+  common_tags = merge(
+    var.default_tags,
+    {
+      Owner      = var.owner
+      AccountId = data.aws_caller_identity.current.account_id
+    }
+  )
 }
